@@ -1,11 +1,4 @@
-try:
-    from rauth import OAuth1Session, OAuth1Service
-except:
-    print "Please import Rauth:\n\n"
-    print "http://rauth.readthedocs.org/en/latest/\n"
-
-import xml.etree.ElementTree as ET
-
+from rauth import OAuth1Session, OAuth1Service
 import json
 
 try:
