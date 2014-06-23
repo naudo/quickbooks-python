@@ -17,20 +17,21 @@ Works like any Python script, but you'll need [rauth](http://rauth.readthedocs.o
 
 Once you've gotten a hold of your QuickBooks access tokens, you can create a QB object:
 
-    qb = QuickBooks(consumer_key = QB_OAUTH_CONSUMER_KEY, 
-            consumer_secret = QB_OAUTH_CONSUMER_SECRET,
-            access_token = QB_ACCESS_TOKEN, 
-            access_token_secret = QB_ACCESS_TOKEN_SECRET,
-            company_id = QB_REALM_ID
-            )
+````python
+from quickbooks.quickbooks import QuickBooks
+
+qb = QuickBooks(consumer_key=QB_OAUTH_CONSUMER_KEY, 
+        consumer_secret=QB_OAUTH_CONSUMER_SECRET,
+        access_token=QB_ACCESS_TOKEN, 
+        access_token_secret=QB_ACCESS_TOKEN_SECRET,
+        company_id=QB_REALM_ID
+    )
+
+````        
 
 __Note:__ the functionality for connecting to the QB API is here as well, I've just not written up proper documentation yet. Have a look at the `get_authorize_url()`, `get_access_tokens()`, and `create_session` methods.
 
 
-### New in v0.1.0
-
-* Well, versioning :)
-* Removed a lot of extraneous method calls that have essentially been replaced with query_object().
 
 ## Available methods
 
