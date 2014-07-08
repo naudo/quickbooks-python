@@ -9,23 +9,20 @@ As HaPsantran says in their ReadMe:
 
 >Generally when using this module (or any of the QBO v3 API wrappers out there), keep in mind that there are some glaring omissions in it's functionality that (AFAIK) no one is able to get around programmatically. For example, you can't access (or create, update, or delete, obvi) Deposits or Transfers.
 
-## Running the script
-
-Works like any Python script, but you'll need [rauth](http://rauth.readthedocs.org/en/latest/) for it to work. 
-
 ## Accessing the API
 
 Once you've gotten a hold of your QuickBooks access tokens, you can create a QB object:
 
 ````python
-from quickbooks.quickbooks import QuickBooks
+from quickbooks.client import QuickBooks
 
-qb = QuickBooks(consumer_key=QB_OAUTH_CONSUMER_KEY, 
-        consumer_secret=QB_OAUTH_CONSUMER_SECRET,
-        access_token=QB_ACCESS_TOKEN, 
-        access_token_secret=QB_ACCESS_TOKEN_SECRET,
-        company_id=QB_REALM_ID
-    )
+qb = QuickBooks(
+    consumer_key=QB_OAUTH_CONSUMER_KEY, 
+    consumer_secret=QB_OAUTH_CONSUMER_SECRET,
+    access_token=QB_ACCESS_TOKEN, 
+    access_token_secret=QB_ACCESS_TOKEN_SECRET,
+    company_id=QB_REALM_ID
+)
 
 ````        
 

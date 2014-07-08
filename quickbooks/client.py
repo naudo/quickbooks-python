@@ -26,6 +26,7 @@ except ImportError:
 
     pass
 
+
 class QuickBooks():
     """A wrapper class around Python's Rauth module for Quickbooks the API"""
 
@@ -33,11 +34,11 @@ class QuickBooks():
     access_token_secret = ''
     consumer_key = ''
     consumer_secret = ''
-    company_id = 0
+    company_id = None
     callback_url = ''
     session = None
 
-    base_url_v3 =  "https://quickbooks.api.intuit.com/v3"
+    base_url_v3 = "https://quickbooks.api.intuit.com/v3"
     base_url_v2 = "https://qbo.intuit.com/qbo1"
 
     request_token_url = "https://oauth.intuit.com/oauth/v1/get_request_token"
@@ -51,17 +52,14 @@ class QuickBooks():
     request_token = ''
     request_token_secret = ''
 
-    def __init__(self, **args):
+    def __init__(self, consumer_key, consumer_secret, **args):
 
         if 'cred_path' in args:
             self.read_creds_from_file(args['cred_path'])
 
-        if 'consumer_key' in args:
-            self.consumer_key = args['consumer_key']
+        self.consumer_key = consumer_key
+        self.consumer_secret = consumer_secret
 
-        if 'consumer_secret' in args:
-            self.consumer_secret = args['consumer_secret']
-                                   
         if 'access_token' in args:
             self.access_token = args['access_token']
 
@@ -70,7 +68,7 @@ class QuickBooks():
 
         if 'company_id' in args:
             self.company_id = args['company_id']
-        
+
         if 'callback_url' in args:
             self.callback_url = args['callback_url']
 
@@ -80,63 +78,73 @@ class QuickBooks():
             self.verbose = False
 
         self._BUSINESS_OBJECTS = [
-
-            "Account","Attachable","Bill","BillPayment",
-            "Class","CompanyInfo","CreditMemo","Customer",
-            "Department","Employee","Estimate","Invoice",
-            "Item","JournalEntry","Payment","PaymentMethod",
-            "Preferences","Purchase","PurchaseOrder",
-            "SalesReceipt","TaxCode","TaxRate","Term",
-            "TimeActivity","Vendor","VendorCredit"
+            "Account", "Attachable", "Bill", "BillPayment",
+            "Class", "CompanyInfo", "CreditMemo", "Customer",
+            "Department", "Employee", "Estimate", "Invoice",
+            "Item", "JournalEntry", "Payment", "PaymentMethod",
+            "Preferences", "Purchase", "PurchaseOrder",
+            "SalesReceipt", "TaxCode", "TaxRate", "Term",
+            "TimeActivity", "Vendor", "VendorCredit"
 
         ]
+        self.qbService = OAuth1Service(
+            name=None,
+            consumer_key=self.consumer_key,
+            consumer_secret=self.consumer_secret,
+            request_token_url=self.request_token_url,
+            access_token_url=self.access_token_url,
+            authorize_url=self.authorize_url,
+            base_url=None
+        )
+    def validate_request_args(self):
+        """ Do some basic checking / error raising before sending off a request
+        """
 
+        if not self.company_id:
+            raise Exception("company_id must be sent for this command.")
 
     def get_authorize_url(self):
-        """Returns the Authorize URL as returned by QB, 
+        """Returns the Authorize URL as returned by QB,
         and specified by OAuth 1.0a.
         :return URI:
         """
-        self.qbService = OAuth1Service(
-                name = None,
-                consumer_key = self.consumer_key,
-                consumer_secret = self.consumer_secret,
-                request_token_url = self.request_token_url,
-                access_token_url = self.access_token_url,
-                authorize_url = self.authorize_url,
-                base_url = None
-            )
         self.request_token, self.request_token_secret = self.qbService.get_request_token(
-                params={'oauth_callback':self.callback_url}
-            )
+                params={'oauth_callback': self.callback_url}
+        )
 
         return self.qbService.get_authorize_url(self.request_token)
 
+
     def get_access_tokens(self, oauth_verifier):
-        """Wrapper around get_auth_session, returns session, and sets 
+        """Wrapper around get_auth_session, returns session, and sets
         access_token and access_token_secret on the QB Object.
         :param oauth_verifier: the oauth_verifier as specified by OAuth 1.0a
         """
         session = self.qbService.get_auth_session(
-                self.request_token, 
-                self.request_token_secret,
-                data={'oauth_verifier': oauth_verifier})
+            self.request_token,
+            self.request_token_secret,
+            data={'oauth_verifier': oauth_verifier}
+        )
 
         self.access_token = session.access_token
         self.access_token_secret = session.access_token_secret
 
         return session
 
+
     def create_session(self):
         if (self.consumer_secret and 
             self.consumer_key and 
             self.access_token_secret and 
             self.access_token):
-            session = OAuth1Session(self.consumer_key,
+
+            session = OAuth1Session(
+                self.consumer_key,
                 self.consumer_secret,
                 self.access_token,
                 self.access_token_secret,
-                )
+            )
+
             self.session = session
         else:
             raise Exception("Need four creds for Quickbooks.create_session.")
@@ -146,7 +154,7 @@ class QuickBooks():
         original_payload =''):
         """ Wrapper script around keep_trying to fetch more results if 
         there are more. """
-        
+        validate_request_args()
         # 500 is the maximum number of results returned by QB
 
         max_results = 500
@@ -219,7 +227,7 @@ class QuickBooks():
         It just submits the request and adds the newly-created object to the
         session's brain.
         """
-    
+        self.validate_request_args()
         if qbbo not in self._BUSINESS_OBJECTS:
             raise Exception("%s is not a valid QBO Business Object." % qbbo,
                             " (Note that this validation is case sensitive.)")
@@ -316,6 +324,9 @@ class QuickBooks():
                                      self.company_id, headers = headers,
                                      data = request_body)
 
+            if self.verbose:
+                print "-"*80
+                print r
             if accept == "json":
                 result = r.json()
                 
@@ -379,6 +390,7 @@ class QuickBooks():
         The parameter dicts should be keyed by parameter name and
             have twp-item tuples for values, which are operator and criterion
         """
+        self.validate_request_args()
 
         if business_object not in self._BUSINESS_OBJECTS:
             raise Exception("%s not in list of QBO Business Objects." %  \
@@ -430,12 +442,6 @@ class QuickBooks():
                 query_tail = " "+query_tail
             query_string+=query_tail
 
-        #CAN ONE SESSION USE MULTIPLE COMPANIES?
-        #IF NOT, REMOVE THE COMPANY OPTIONALITY
-        url = self.base_url_v3 + "/company/%s/query" % self.company_id
-
-        #print query_string
-
         results = self.query_fetch_more(r_type="POST",
                                         header_auth=True,
                                         realm=self.company_id,
@@ -453,7 +459,7 @@ class QuickBooks():
         The same is true with linked transactions, so transactions can
         also be cloned with this method
         """
-
+        self.validate_request_args()
         #we'll call the attributes by the Business Object's name + 's',
         #case-sensitive to what Intuit's documentation uses
 
@@ -639,7 +645,7 @@ class QuickBooks():
         For now, this just returns all the lines (we can get...excludes such
         things as deposits and transfers...thanks, Intuit!)
         """
-        
+
         #the True gives us headers!
         unsorted_gl = self.ledger_lines(None, None, None, True)
 
