@@ -1,5 +1,7 @@
 from rauth import OAuth1Session, OAuth1Service
 import json
+from exceptions import NotAuthorized
+import reference
 
 try:
 
@@ -11,7 +13,6 @@ try:
     """
 
     import massage
-    import reference
     import report
 
 except ImportError:
@@ -77,16 +78,6 @@ class QuickBooks():
         else:
             self.verbose = False
 
-        self._BUSINESS_OBJECTS = [
-            "Account", "Attachable", "Bill", "BillPayment",
-            "Class", "CompanyInfo", "CreditMemo", "Customer",
-            "Department", "Employee", "Estimate", "Invoice",
-            "Item", "JournalEntry", "Payment", "PaymentMethod",
-            "Preferences", "Purchase", "PurchaseOrder",
-            "SalesReceipt", "TaxCode", "TaxRate", "Term",
-            "TimeActivity", "Vendor", "VendorCredit"
-
-        ]
         self.qbService = OAuth1Service(
             name=None,
             consumer_key=self.consumer_key,
@@ -133,9 +124,9 @@ class QuickBooks():
 
 
     def create_session(self):
-        if (self.consumer_secret and 
-            self.consumer_key and 
-            self.access_token_secret and 
+        if (self.consumer_secret and
+            self.consumer_key and
+            self.access_token_secret and
             self.access_token):
 
             session = OAuth1Session(
@@ -150,9 +141,9 @@ class QuickBooks():
             raise Exception("Need four creds for Quickbooks.create_session.")
         return self.session
 
-    def query_fetch_more(self, r_type, header_auth, realm, qb_object, 
+    def query_fetch_more(self, r_type, header_auth, realm, qb_object,
         original_payload =''):
-        """ Wrapper script around keep_trying to fetch more results if 
+        """ Wrapper script around keep_trying to fetch more results if
         there are more. """
         validate_request_args()
         # 500 is the maximum number of results returned by QB
@@ -164,14 +155,14 @@ class QuickBooks():
         url = self.base_url_v3 + "/company/%s/query" % self.company_id
 
         # Edit the payload to return more results.
-        
+
         payload = original_payload + " MAXRESULTS " + str(max_results)
-        
+
         while more:
-            
+
             r_dict = self.hammer_it(r_type,
-                                    url, 
-                                    payload, 
+                                    url,
+                                    payload,
                                     "text"
                                     )
 
@@ -193,12 +184,12 @@ class QuickBooks():
             # in that case, check the length, even though that actually requires
             # measuring
             try:
-                result_count = int(r_dict['QueryResponse']['totalCount']) 
+                result_count = int(r_dict['QueryResponse']['totalCount'])
                 if result_count < max_results:
                     more = False
             except KeyError:
                 try:
-                    result_count = len(r_dict['QueryResponse'][qb_object]) 
+                    result_count = len(r_dict['QueryResponse'][qb_object])
                     if result_count < max_results:
                         more = False
                 except KeyError:
@@ -210,7 +201,7 @@ class QuickBooks():
                 start_position = 1
 
             start_position = start_position + max_results
-            payload = "%s STARTPOSITION %s MAXRESULTS %s" % (original_payload, 
+            payload = "%s STARTPOSITION %s MAXRESULTS %s" % (original_payload,
                     start_position, max_results)
 
 
@@ -228,7 +219,7 @@ class QuickBooks():
         session's brain.
         """
         self.validate_request_args()
-        if qbbo not in self._BUSINESS_OBJECTS:
+        if qbbo not in reference.BUSINESS_OBJECTS:
             raise Exception("%s is not a valid QBO Business Object." % qbbo,
                             " (Note that this validation is case sensitive.)")
 
@@ -243,11 +234,11 @@ class QuickBooks():
 
         new_object = self.hammer_it("POST", url, request_body, content_type)\
                      [qbbo]
-        
+
         new_Id     = new_object["Id"]
 
         attr_name = qbbo+"s"
-        
+
         if not hasattr(self,attr_name):
 
             if self.verbose:
@@ -256,12 +247,12 @@ class QuickBooks():
             setattr(self, attr_name, {new_Id:new_object})
 
         else:
-            
+
             if self.verbose:
                 print "Adding this new %s to the existing set of them." \
                     % qbbo
                 print json.dumps(new_object, indent=4)
-                
+
             getattr(self, attr_name)[new_Id] = new_object
 
         return new_object
@@ -287,7 +278,7 @@ class QuickBooks():
 
         pass
 
-    def hammer_it(self, request_type, url, request_body = {}, 
+    def hammer_it(self, request_type, url, request_body = {},
                 content_type="text", accept = 'json'):
         """
         A slim version of simonv3's excellent keep_trying method. Among other
@@ -313,12 +304,12 @@ class QuickBooks():
 
         while trying:
             tries += 1
-                  
+
 
             headers = {
-                    'Content-Type': 'application/%s' % content_type,
-                    'Accept': 'application/%s' % accept
-                }
+                'Content-Type': 'application/%s' % content_type,
+                'Accept': 'application/%s' % accept
+            }
 
             r = session.request(request_type, url, header_auth,
                                      self.company_id, headers = headers,
@@ -328,8 +319,11 @@ class QuickBooks():
                 print "-"*80
                 print r
             if accept == "json":
+                if r.status_code == 401:
+                    raise NotAuthorized()
+
                 result = r.json()
-                
+
                 if "Fault" in result and result["Fault"]\
                    ["type"] == "ValidationFault":
 
@@ -339,12 +333,12 @@ class QuickBooks():
 
                     trying = False
                     print_error = True
-                    
+
 
                 elif tries >= 6:
 
                     trying = False
-                  
+
                     if "Fault" in result:
                         print_error = True
 
@@ -365,14 +359,14 @@ class QuickBooks():
 
     def get_single_object(self, qbbo, pk=None):
         if pk:
-            if qbbo not in self._BUSINESS_OBJECTS:
+            if qbbo not in reference.BUSINESS_OBJECTS:
                 raise Exception("%s not in list of QBO Business Objects." %  \
                             qbbo + " Please use one of the " + \
-                            "following: %s" % self._BUSINESS_OBJECTS)
-            
+                            "following: %s" % reference.BUSINESS_OBJECTS)
+
 
             url = self.base_url_v3 + "/company/%s/%s/%s/" % (
-                                                            self.company_id, 
+                                                            self.company_id,
                                                             qbbo.lower(),
                                                             pk)
 
@@ -392,17 +386,17 @@ class QuickBooks():
         """
         self.validate_request_args()
 
-        if business_object not in self._BUSINESS_OBJECTS:
+        if business_object not in reference.BUSINESS_OBJECTS:
             raise Exception("%s not in list of QBO Business Objects." %  \
                             business_object + " Please use one of the " + \
-                            "following: %s" % self._BUSINESS_OBJECTS)
+                            "following: %s" % reference.BUSINESS_OBJECTS)
 
         #eventually, we should be able to select more than just *,
         #but chances are any further filtering is easier done with Python
         #than in the query...
 
         query_string="SELECT * FROM %s" % business_object
-        
+
         if query_tail == "" and not params == {}:
 
             #It's not entirely obvious what are valid properties for
@@ -419,7 +413,7 @@ class QuickBooks():
             }
 
             p = params.keys()
-            
+
             #only validating the property name for now, not the DataType
             if p[0] not in props:
                 raise Exception("Unfamiliar property: %s" % p[0])
@@ -432,7 +426,7 @@ class QuickBooks():
                 for i in range(1,len(p)+1):
                     if p[i] not in props:
                         raise Exception("Unfamiliar property: %s" % p[i])
-                    
+
                     query_string+=" AND %s %s %s" % (p[i],
                                                      params[p[i]][0],
                                                      params[p[i]][1])
@@ -463,8 +457,8 @@ class QuickBooks():
         #we'll call the attributes by the Business Object's name + 's',
         #case-sensitive to what Intuit's documentation uses
 
-        if qbbo not in self._BUSINESS_OBJECTS:
-            raise Exception("%s is not a valid QBO Business Object." % qbbo) 
+        if qbbo not in reference.BUSINESS_OBJECTS:
+            raise Exception("%s is not a valid QBO Business Object." % qbbo)
 
         attr_name = qbbo+"s"
 
@@ -489,7 +483,7 @@ class QuickBooks():
                 object_dict[Id] = o
 
             setattr(self, attr_name, object_dict)
-            
+
         return getattr(self,attr_name)
 
     def object_dicts(self, qbbo_list = [], requery=False,
@@ -523,7 +517,7 @@ class QuickBooks():
         returned dict has two dimensions:
         name = names[qbbo][Id]
         """
-      
+
 
         name_list_objects = [
            "Account", "Class", "Customer", "Department", "Employee", "Item",
@@ -544,7 +538,7 @@ class QuickBooks():
         """
         transaction_objects = [
             "Bill", "BillPayment", "CreditMemo", "Estimate", "Invoice",
-            "JournalEntry", "Payment", "Purchase", "PurchaseOrder", 
+            "JournalEntry", "Payment", "Purchase", "PurchaseOrder",
             "SalesReceipt", "TimeActivity", "VendorCredit"
         ]
 
@@ -576,7 +570,7 @@ class QuickBooks():
 
     def ledgerize(self, transaction, headers=False):
         """see ledgerize.__doc__ in the massage module"""
-        
+
         return massage.ledgerize(transaction, self, headers)
 
     def ledger_lines(self, qbbo=None, Id=None, line_number=None, headers=False,
@@ -590,7 +584,7 @@ class QuickBooks():
 
         return massage.ledger_lines(self, qbbo, Id, line_number, headers,
                                     **kwargs)
-                    
+
     def entity_list(self,raw_entities_dict):
         """see entity_list.__doc__ in the massage module"""
 
@@ -599,11 +593,11 @@ class QuickBooks():
     def get_entity(self, qbbo, entity_id):
         """
         Note that this queries all objects of this type (for later convenience)!
-        
+
         Creates (or refers to an attribute that's) a dictionary
          of all entities (names and transactions) keyed by
          Id (because every object has a unique one).
-        
+
         Returns a tuple in the form (qbbo_type, raw_object_dict)
         """
         if not hasattr(self, qbbo+"s"):
@@ -616,11 +610,11 @@ class QuickBooks():
         """
         In QBO, you can only use one A/P account with "Bills" (though you can
         pro'ly use others with JEs and other entries if you want to.
-        
+
         This figures out which A/P account that is (by ID)
         """
         if not hasattr(self,"ap_account_id"):
-            
+
             Bills        = self.get_objects("Bill")
 
             first_bill   = Bills[Bills.keys()[0]]
